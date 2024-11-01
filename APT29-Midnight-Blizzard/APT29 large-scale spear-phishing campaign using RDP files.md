@@ -9,6 +9,7 @@ This advanced hunting query monitors domains and files associated with the ongoi
 ## Detection Opportunities (KQL):
 
 ```kusto
+//Replace "Timestamp" with "TimeGenerated" when running this KQL query in Microsoft Sentinel.
 let RdpFiles = externaldata(MD5: string , RdpFileName: string, Campaign: string, Ref: string )[@"https://raw.githubusercontent.com/CTI-Driven/Advanced-Threat-Hunting-KQL-General-Campaigns/refs/heads/main/APT29-Midnight-Blizzard/APT29-Midnight-Blizzard-RdpFileName.csv"] with (format="csv", ignoreFirstRecord=True);
 let Domains = externaldata(Domains: string , Campaign: string, Ref: string)[@"https://raw.githubusercontent.com/CTI-Driven/Advanced-Threat-Hunting-KQL-General-Campaigns/refs/heads/main/APT29-Midnight-Blizzard/APT29-Midnight-Blizzard-Domains.csv"] with (format="csv", ignoreFirstRecord=True);
 let RdpFilesName    =(RdpFiles | where isnotempty(RdpFileName) | distinct RdpFileName);
