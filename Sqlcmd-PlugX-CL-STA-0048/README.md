@@ -41,4 +41,4 @@ DeviceFileEvents
 ```
  
 ## References:
-- [https://www.microsoft.com/en-us/security/blog/2024/10/29/midnight-blizzard-conducts-large-scale-spear-phishing-campaign-using-rdp-files/](https://www.bitdefender.com/en-us/blog/businessinsights/uac-0063-cyber-espionage-operation-expanding-from-central-asia)
+- [https://unit42.paloaltonetworks.com/espionage-campaign-targets-south-asian-entities/](https://unit42.paloaltonetworks.com/espionage-campaign-targets-south-asian-entities/)
