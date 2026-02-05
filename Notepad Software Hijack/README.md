@@ -5,7 +5,7 @@ This advanced hunting KQL query hunts for indicators of the recent Notepad++ sof
 
 ## TTPs and Threat Hunting Hypothesis in Scope
 
-- **TTPs identified and implemented for threat hunting include:** `gup.exe` making network connections to domains other than `notepad-plus-plus.org`, `github.com`, or `release-assets.githubusercontent.com`.
+- **`gup.exe` making network connections to domains other than** `notepad-plus-plus.org`, `github.com`, or `release-assets.githubusercontent.com`.
 - **`gup.exe` spawning unusual child processes;** under normal behavior, it should only spawn `explorer.exe` or legitimate Notepad++ installer processes with valid GlobalSign digital signatures.
 - **Suspicious files such as** `update.exe`, `AutoUpdater.exe`, or other anomalous executables written by `gup.exe` to the user TEMP directory.
 - **DLL sideloading involving** `BluetoothService.exe` loading a malicious `log.dll` backdoor.
