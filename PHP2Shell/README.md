@@ -51,7 +51,6 @@ DeviceTvmSoftwareInventory
 
 ```kusto
 let timeframe = 7d;
-let ScopeToPhpHosts = true;
 let PhpHostsIsInternetFacing =
     DeviceTvmSoftwareInventory
     | where SoftwareName contains "php"
@@ -69,7 +68,7 @@ let ShellRx = @"(?i)^(sh|dash|bash|cmd\.exe|powershell\.exe)$";
 DeviceProcessEvents
 | extend EventTime = coalesce(column_ifexists("Timestamp", datetime(null)),column_ifexists("TimeGenerated", datetime(null)))
 | where EventTime >= ago(timeframe)
-| where not(ScopeToPhpHosts) or DeviceId in (PhpHostsIsInternetFacing)
+| where DeviceId has_any (PhpHostsIsInternetFacing)
 | extend ParentIsPhp = InitiatingProcessFileName matches regex PhpWorker
                     or InitiatingProcessFileName in~ (WebServer)
 | extend GrandParentIsPhp = InitiatingProcessParentFileName matches regex PhpWorker
@@ -126,8 +125,6 @@ DeviceProcessEvents
 ### Script Files Written to Web Roots by PHP or a Shell Under PHP (KQL)
 
 ```kusto
-// Set WebRoots to your real document roots. Expect noise from CMS updates, plugin installs and deployments.
-// The .sh, .py and .pl extensions are noisy in web roots that hold ordinary scripts.
 let timeframe = 7d;
 let PhpHostsIsInternetFacing =
     DeviceTvmSoftwareInventory
