@@ -25,26 +25,78 @@ The advanced hunting queries below are designed to detect expected post-exploita
 ### Exposure: Internet-Facing Devices With PHP Installed (KQL)
 
 ```kusto
-// Any device flagged internet-facing at any point in the timeframe is included.
-// "contains" is used so packages such as libapache2-mod-php8.x match. Review the matched software list.
-// The CVE column will be empty until CVE-2026-109618 and CVE-2026-109619 exist in Defender vulnerability data.
-let timeframe = 7d;
-DeviceTvmSoftwareInventory
-| where SoftwareName contains "php"
-| join kind=inner (
+//The software inventory list identifies devices where PHP is installed, but it does not confirm that PHP is actively used or running.
+let LatestDeviceInfo =
     DeviceInfo
-    | extend EventTime = coalesce(column_ifexists("Timestamp", datetime(null)),column_ifexists("TimeGenerated", datetime(null)))
-    | where EventTime >= ago(timeframe)
-    | where IsInternetFacing
-    | summarize arg_max(Timestamp, IsInternetFacing, PublicIP) by DeviceId
-) on DeviceId
-| join kind=leftouter (
-    DeviceTvmSoftwareVulnerabilities
-    | where CveId in ("CVE-2026-109618", "CVE-2026-109619")
-    | summarize ImpactedCves = make_set(CveId) by DeviceId
-) on DeviceId
-| distinct DeviceName, IsInternetFacing, OSPlatform, PublicIP, SoftwareName, SoftwareVersion, tostring(ImpactedCves)
-| order by DeviceName asc
+    | summarize arg_max(Timestamp, IsInternetFacing) by DeviceId
+    | project DeviceId, IsInternetFacing;
+DeviceTvmSoftwareInventory
+| where isnotempty(DeviceName)
+| where SoftwareName matches regex @"(?i)^php[0-9]*(\.[0-9]+)*(_for_linux)?$"
+| join kind=leftouter LatestDeviceInfo on DeviceId
+| summarize
+    SoftwareVersion = make_set_if(SoftwareVersion, isnotempty(SoftwareVersion), 50),
+    IsInternetFacing = any(IsInternetFacing)
+    by DeviceName, OSPlatform, SoftwareName
+| project
+    DeviceName,
+    OSPlatform,
+    SoftwareName,
+    SoftwareVersion,
+    IsInternetFacing
+| order by  IsInternetFacing desc  , DeviceName desc
+```
+
+### Devices observed running PHP based on DeviceProcessEvents telemetry (PHP is actively used or running on the device)
+
+```kusto
+// I recommend starting with the list of devices where PHP process execution was observed in DeviceProcessEvents and does confirm that PHP is actively used or running
+let ProcessLookback = 7d;
+let ObservedPhpExecution =
+    DeviceProcessEvents
+    | where Timestamp >= ago(ProcessLookback)
+    | where FileName matches regex
+        @"(?i)^php([0-9.]*)?(-fpm|-cgi)?([0-9.]*)?(\.exe)?$"
+    | summarize
+        LastSeenTime_PhpExecution = max(Timestamp),
+        ExecutedPhpProcesses = make_set(FileName, 20),
+        PhpExecutablePaths = make_set_if(
+            FolderPath,
+            isnotempty(FolderPath),
+            20
+        )
+        by DeviceId;
+let LatestDeviceInfo =
+    DeviceInfo
+    | summarize arg_max(Timestamp, IsInternetFacing) by DeviceId
+    | project DeviceId, IsInternetFacing;
+DeviceTvmSoftwareInventory
+| where isnotempty(DeviceName)
+| where SoftwareName matches regex
+    @"(?i)^php[0-9]*(\.[0-9]+)*(_for_linux)?$"
+| join kind=inner ObservedPhpExecution on DeviceId
+| join kind=leftouter LatestDeviceInfo on DeviceId
+| summarize
+    SoftwareVersion = make_set_if(
+        SoftwareVersion,
+        isnotempty(SoftwareVersion),
+        50
+    ),
+    LastSeenTime_PhpExecution = max(LastSeenTime_PhpExecution),
+    ExecutedPhpProcesses = take_any(ExecutedPhpProcesses),
+    PhpExecutablePaths = take_any(PhpExecutablePaths),
+    IsInternetFacing = any(IsInternetFacing)
+    by DeviceName, DeviceId, OSPlatform, SoftwareName
+| project
+    DeviceName,
+    OSPlatform,
+    SoftwareName,
+    SoftwareVersion,
+    LastSeenTime_PhpExecution,
+    ExecutedPhpProcesses,
+    PhpExecutablePaths,
+    IsInternetFacing
+| order by IsInternetFacing desc, LastSeenTime_PhpExecution desc
 ```
 
 ### PHP Worker Spawning Shells, Interpreters, Download Tools and Recon Commands (KQL)
