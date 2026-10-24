@@ -2,7 +2,13 @@
 
 ## Summary
 
-The advanced hunting queries below are designed to detect expected post-exploitation behavior on PHP web servers, following the disclosure of two critical PHP core vulnerabilities reported as CVE-2026-109618 and CVE-2026-109619 and nicknamed "PHP2Shell". The PHP security team rated both CVSS v4.0 9.2 and scheduled fixes for 21 October 2026 at 14:00 UTC.
+These advanced hunting queries detect post-exploitation behavior on PHP web servers affected by two critical PHP core vulnerabilities, CVE-2026-109618 and CVE-2026-109619, nicknamed “PHP2Shell”. The PHP security team rated both CVSS v4.0 9.2 and scheduled fixes for 21 October 2026 at 14:00 UTC.
+
+Exploitation in the wild has been confirmed. On 24 October 2026, honeypot packet captures and process telemetry showed Apache workers (uid 33) starting /bin/sh after a four-stage multipart POST chain, followed by id, curl, wget and php -r callbacks to the attacker’s infrastructure. The observed chain is consistent with CVE-2026-109618. The records do not show a separate CVE-2026-109619 path.
+
+The queries cover the process, file and network activity that follows a successful exploit: shells, interpreters and download tools spawned by a PHP or web server worker, reverse shell strings, files written to web roots, and connections to known source IPs. They do not detect the exploit requests themselves. Those need web server or packet logs, because the exploit stages produce PHP out-of-memory errors and worker crashes, and HTTP 200 responses are not a success signal.
+
+Source IPs are hosting-provider addresses that can be reassigned. Treat them as hunting leads, not blocklists.
 
 
 ## ATT&CK Techniques in Scope:
