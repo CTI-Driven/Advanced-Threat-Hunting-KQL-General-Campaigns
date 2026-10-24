@@ -103,24 +103,12 @@ DeviceTvmSoftwareInventory
 
 ```kusto
 let timeframe = 7d;
-let PhpHostsIsInternetFacing =
-    DeviceTvmSoftwareInventory
-    | where SoftwareName contains "php"
-    | distinct DeviceId
-    | join kind=inner (
-        DeviceInfo
-        | where Timestamp >= ago(7d)
-        | where IsInternetFacing
-        | distinct DeviceId
-    ) on DeviceId
-    | project DeviceId;
 let PhpWorker = @"(?i)^(php-fpm[\d.]*|php-cgi[\d.]*)(\.exe)?$";
 let WebServer = dynamic(["httpd","apache2"]);
 let ShellRx = @"(?i)^(sh|dash|bash|cmd\.exe|powershell\.exe)$";
 DeviceProcessEvents
-| extend EventTime = coalesce(column_ifexists("Timestamp", datetime(null)),column_ifexists("TimeGenerated", datetime(null)))
-| where EventTime >= ago(timeframe)
-| where DeviceId has_any (PhpHostsIsInternetFacing)
+| where Timestamp >= ago(timeframe)
+| where InitiatingProcessAccountName !~ "root"
 | extend ParentIsPhp = InitiatingProcessFileName matches regex PhpWorker
                     or InitiatingProcessFileName in~ (WebServer)
 | extend GrandParentIsPhp = InitiatingProcessParentFileName matches regex PhpWorker
@@ -129,39 +117,29 @@ DeviceProcessEvents
 | where ParentIsPhp or (GrandParentIsPhp and ParentIsShell)
 | extend Category = case(
     FileName matches regex ShellRx, "Shell",
-    FileName matches regex @"(?i)^(python[\d.]*|perl[\d.]*)(\.exe)?$", "Interpreter",
+    FileName matches regex @"(?i)^(python[\d.]*|perl[\d.]*|php[\d.]*)(\.exe)?$", "Interpreter",
     FileName matches regex @"(?i)^(curl|wget|nc(\..+)?|certutil)(\.exe)?$", "Download or network tool",
     FileName matches regex @"(?i)^(whoami|id|uname|ipconfig)(\.exe)?$", "Recon command",
     "")
 | where isnotempty(Category)
 | project Timestamp, DeviceName, DeviceId, Category, AccountName,
+          InitiatingProcessAccountName,
           InitiatingProcessParentFileName, InitiatingProcessFileName,
           FileName, ProcessCommandLine, InitiatingProcessCommandLine
 | order by Timestamp desc
+
 ```
 
 ### Reverse Shell Patterns Under PHP (KQL)
 
 ```kusto
 let timeframe = 7d;
-let PhpHostsIsInternetFacing =
-    DeviceTvmSoftwareInventory
-    | where SoftwareName contains "php"
-    | distinct DeviceId
-    | join kind=inner (
-        DeviceInfo
-        | where Timestamp >= ago(7d)
-        | where IsInternetFacing
-        | distinct DeviceId
-    ) on DeviceId
-    | project DeviceId;
 let PhpWorker = @"(?i)^(php-fpm[\d.]*|php-cgi[\d.]*)(\.exe)?$";
 let WebServer = dynamic(["httpd","apache2"]);
 let Shells = dynamic(["sh","dash","bash","cmd.exe","powershell.exe"]);
 DeviceProcessEvents
-| extend EventTime = coalesce(column_ifexists("Timestamp", datetime(null)),column_ifexists("TimeGenerated", datetime(null)))
-| where EventTime >= ago(timeframe)
-| where DeviceId has_any (PhpHostsIsInternetFacing)
+| where Timestamp >= ago(timeframe)
+| where InitiatingProcessAccountName !~ "root"
 | extend ParentIsPhp = InitiatingProcessFileName matches regex PhpWorker
                     or InitiatingProcessFileName in~ (WebServer)
 | extend GrandParentIsPhp = InitiatingProcessParentFileName matches regex PhpWorker
@@ -178,21 +156,11 @@ DeviceProcessEvents
 
 ```kusto
 let timeframe = 7d;
-let PhpHostsIsInternetFacing =
-    DeviceTvmSoftwareInventory
-    | where SoftwareName contains "php"
-    | distinct DeviceId
-    | join kind=inner (
-        DeviceInfo
-        | where Timestamp >= ago(7d)
-        | where IsInternetFacing
-        | distinct DeviceId
-    ) on DeviceId
-    | project DeviceId;
 let WebRoots = dynamic(["/var/www/", "\\inetpub\\wwwroot\\"]);
 let PhpWorker = @"(?i)^(php-fpm[\d.]*|php-cgi[\d.]*)(\.exe)?$";
 let WebServer = dynamic(["httpd","apache2"]);
 let Shells = dynamic(["sh","dash","bash","cmd.exe","powershell.exe"]);
+let ScriptExt = @"(?i)\.(php\d*|phtml|phar|pht|ph|asp|aspx|ashx|asmx|jsp|jspx|pl|py|cgi|sh)$";
 DeviceFileEvents
 | extend EventTime = coalesce(column_ifexists("Timestamp", datetime(null)),column_ifexists("TimeGenerated", datetime(null)))
 | where EventTime >= ago(timeframe)
