@@ -187,4 +187,4 @@ DeviceFileEvents
 * https://watchtowr.com/intelligence/php-cve-2026-109618-faq/
 * https://cert.europa.eu/publications/security-advisories/2026-018/
 * https://github.com/Neo23x0/process-watcher/blob/main/emerging-threats/php-rce-october-26/README.md
-* Replaces the shared device gate in queries 3, 4 and 5 of the CTI-Driven PHP2Shell README, and fixes two detection gaps found against the confirmed-RCE report (honeypot-data, 2026-10-24).
+* https://github.com/0x4D31/honeypot-data/blob/main/reports/php2shell/2026-10-22-to-24-initial-attempts.md
