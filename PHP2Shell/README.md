@@ -36,21 +36,12 @@ let LatestDeviceInfo =
     DeviceInfo
     | summarize arg_max(Timestamp, IsInternetFacing) by DeviceId
     | project DeviceId, IsInternetFacing;
-DeviceTvmSoftwareInventory
-| where isnotempty(DeviceName)
-| where SoftwareName matches regex @"(?i)^php[0-9]*(\.[0-9]+)*(_for_linux)?$"
+DeviceTvmSoftwareVulnerabilities
+| where CveId in~ ("CVE-2026-109618", "CVE-2026-109619")
 | join kind=leftouter LatestDeviceInfo on DeviceId
-| summarize
-    SoftwareVersion = make_set_if(SoftwareVersion, isnotempty(SoftwareVersion), 50),
-    IsInternetFacing = any(IsInternetFacing)
-    by DeviceName, OSPlatform, SoftwareName
-| project
-    DeviceName,
-    OSPlatform,
-    SoftwareName,
-    SoftwareVersion,
-    IsInternetFacing
-| order by  IsInternetFacing desc  , DeviceName desc
+| project DeviceName, DeviceId, OSPlatform, SoftwareName, SoftwareVersion,
+          CveId, VulnerabilitySeverityLevel, RecommendedSecurityUpdate, IsInternetFacing
+| order by IsInternetFacing desc, DeviceName asc
 ```
 
 ### Devices observed running PHP based on DeviceProcessEvents telemetry (PHP is actively used or running on the device)
@@ -109,11 +100,23 @@ DeviceTvmSoftwareInventory
 
 ```kusto
 let timeframe = 7d;
+let PhpHostsIsInternetFacing =
+    DeviceTvmSoftwareVulnerabilities
+    | where CveId has_any ("CVE-2026-109618","CVE-2026-109619")
+    | distinct DeviceId
+    | join kind=inner (
+        DeviceInfo
+        | where Timestamp >= ago(7d)
+        | where IsInternetFacing
+        | distinct DeviceId
+    ) on DeviceId
+    | project DeviceId;
 let PhpWorker = @"(?i)^(php-fpm[\d.]*|php-cgi[\d.]*)(\.exe)?$";
 let WebServer = dynamic(["httpd","apache2"]);
 let ShellRx = @"(?i)^(sh|dash|bash|cmd\.exe|powershell\.exe)$";
 DeviceProcessEvents
 | where Timestamp >= ago(timeframe)
+| where DeviceId  has_any (PhpHostsIsInternetFacing)
 | where InitiatingProcessAccountName !~ "root"
 | extend ParentIsPhp = InitiatingProcessFileName matches regex PhpWorker
                     or InitiatingProcessFileName in~ (WebServer)
@@ -133,18 +136,29 @@ DeviceProcessEvents
           InitiatingProcessParentFileName, InitiatingProcessFileName,
           FileName, ProcessCommandLine, InitiatingProcessCommandLine
 | order by Timestamp desc
-
 ```
 
 ### Reverse Shell Patterns Under PHP (KQL)
 
 ```kusto
 let timeframe = 7d;
+let PhpHostsIsInternetFacing =
+    DeviceTvmSoftwareVulnerabilities
+    | where CveId has_any ("CVE-2026-109618","CVE-2026-109619")
+    | distinct DeviceId
+    | join kind=inner (
+        DeviceInfo
+        | where Timestamp >= ago(7d)
+        | where IsInternetFacing
+        | distinct DeviceId
+    ) on DeviceId
+    | project DeviceId;
 let PhpWorker = @"(?i)^(php-fpm[\d.]*|php-cgi[\d.]*)(\.exe)?$";
 let WebServer = dynamic(["httpd","apache2"]);
 let Shells = dynamic(["sh","dash","bash","cmd.exe","powershell.exe"]);
 DeviceProcessEvents
 | where Timestamp >= ago(timeframe)
+| where DeviceId has_any (PhpHostsIsInternetFacing)
 | where InitiatingProcessAccountName !~ "root"
 | extend ParentIsPhp = InitiatingProcessFileName matches regex PhpWorker
                     or InitiatingProcessFileName in~ (WebServer)
@@ -161,8 +175,19 @@ DeviceProcessEvents
 ### Script Files Written to Web Roots by PHP or a Shell Under PHP (KQL)
 
 ```kusto
-let timeframe = 7d;
-let WebRoots = dynamic(["/var/www/", "\\inetpub\\wwwroot\\"]);
+let timeframe = 24hr;
+let PhpHostsIsInternetFacing =
+    DeviceTvmSoftwareVulnerabilities
+    | where CveId has_any ("CVE-2026-109618","CVE-2026-109619")
+    | distinct DeviceId
+    | join kind=inner (
+        DeviceInfo
+        | where Timestamp >= ago(7d)
+        | where IsInternetFacing
+        | distinct DeviceId
+    ) on DeviceId
+    | project DeviceId;
+let WebRoots = dynamic(["/var/www/", \\inetpub\\wwwroot\\]);
 let PhpWorker = @"(?i)^(php-fpm[\d.]*|php-cgi[\d.]*)(\.exe)?$";
 let WebServer = dynamic(["httpd","apache2"]);
 let Shells = dynamic(["sh","dash","bash","cmd.exe","powershell.exe"]);
